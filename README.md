@@ -43,7 +43,7 @@ fetcher = DataFetcher(api_key="your-api-key", base_url="https://api.alphaxllama.
 ROUTE = "bybit-direct|/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60"
 
 # --- backtest: a fixed historical range ------------------------------------
-df = fetcher.get(ROUTE, mode="backtest", start_time=one_week_ago, end_time=now)
+df = fetcher.get(ROUTE, mode="backtest", start_time="2023-01-01", end_time="now")
 
 # --- live: no loop to write, just what happens on each update -------------
 def on_update(df):

@@ -1,6 +1,6 @@
 import time
 from datetime import datetime, timezone
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple, Union
 from urllib.parse import parse_qsl
 
 import pandas as pd
@@ -28,6 +28,39 @@ def _fmt_ts(ms: int) -> str:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
+_TIME_STRING_FORMATS = ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S")
+
+
+def _parse_time(value: Optional[Union[int, str]], *, param_name: str) -> Optional[int]:
+    """Normalize a `start_time`/`end_time` argument to milliseconds since epoch.
+
+    Accepts an `int` unchanged (the original, still-supported contract — nothing
+    passing raw ms breaks), or a human-readable string: `"now"` (case-insensitive),
+    `"YYYY-MM-DD"`, `"YYYY-MM-DD HH:MM:SS"`, or `"YYYY-MM-DDTHH:MM:SS"`. A date-only
+    string means midnight of that day. String inputs are always interpreted as
+    **UTC**, deliberately — never the caller's local system timezone — so
+    `start_time="2023-01-01"` means the same real moment regardless of where the
+    calling machine happens to be, which matters for a quant data SDK where a
+    silently-shifted range would be a correctness bug, not a display quirk.
+    """
+    if value is None or isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if text.lower() == "now":
+            return int(time.time() * 1000)
+        for fmt in _TIME_STRING_FORMATS:
+            try:
+                return int(datetime.strptime(text, fmt).replace(tzinfo=timezone.utc).timestamp() * 1000)
+            except ValueError:
+                continue
+        raise ValueError(
+            f"{param_name}={value!r} isn't a recognized format — use an int (ms since epoch), "
+            f"'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS', 'YYYY-MM-DDTHH:MM:SS', or 'now'"
+        )
+    raise TypeError(f"{param_name} must be an int, str, or None — got {type(value).__name__}")
+
+
 class DataFetcher:
     """
     Client for the Cytrade data gateway. One call shape for both backtest and
@@ -49,6 +82,12 @@ class DataFetcher:
     means repeated calls are cheap; only the newest bar(s) since your last call ever
     trigger a real fetch from the underlying provider.
 
+    `start_time`/`end_time` (backtest only) accept either an `int` (ms since epoch,
+    the original contract — still works unchanged) or a human-readable string:
+    `"2023-01-01"`, `"2023-01-01 00:00:00"`, `"2023-01-01T00:00:00"`, or `"now"`
+    (case-insensitive). String inputs are always interpreted as UTC, never the
+    calling machine's local timezone — see `_parse_time` for why that matters here.
+
     Set verbose=False to silence the progress lines this prints for every request.
     """
 
@@ -63,8 +102,8 @@ class DataFetcher:
         self,
         route: str,
         mode: str = "backtest",
-        start_time: Optional[int] = None,
-        end_time: Optional[int] = None,
+        start_time: Optional[Union[int, str]] = None,
+        end_time: Optional[Union[int, str]] = None,
         length: Optional[int] = None,
     ) -> pd.DataFrame:
         provider, path, params = _parse_route(route)
@@ -72,6 +111,8 @@ class DataFetcher:
         if mode == "backtest":
             if length is not None:
                 raise ValueError("length is only used with mode='live' — backtest uses start_time/end_time")
+            start_time = _parse_time(start_time, param_name="start_time")
+            end_time = _parse_time(end_time, param_name="end_time")
             return self._get_backtest(route, provider, path, params, start_time, end_time)
 
         if mode == "live":

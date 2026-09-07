@@ -106,6 +106,20 @@ def test_get_live_rejects_start_end_time(fetcher):
         fetcher.get("bybit-direct|/v5/market/kline", mode="live", length=10, start_time=1)
 
 
+def test_get_backtest_accepts_human_readable_date_strings(fetcher):
+    from unittest.mock import Mock
+
+    fetcher._get_backtest = Mock(return_value="sentinel")
+    route = "bybit-direct|/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60"
+
+    fetcher.get(route, mode="backtest", start_time="2023-01-01", end_time="2023-01-02")
+
+    fetcher._get_backtest.assert_called_once_with(
+        route, "bybit-direct", "/v5/market/kline", {"category": "linear", "symbol": "BTCUSDT", "interval": "60"},
+        1672531200000, 1672617600000,
+    )
+
+
 def test_get_unknown_mode_raises(fetcher):
     with pytest.raises(ValueError):
         fetcher.get("bybit-direct|/v5/market/kline", mode="bogus")

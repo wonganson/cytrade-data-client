@@ -92,10 +92,10 @@ create one instance per key/environment, reuse it for every call.
 ```python
 fetcher.get(
     route: str,
-    mode: str = "backtest",              # "backtest" | "live"
-    start_time: int | None = None,       # ms since epoch — backtest only
-    end_time: int | None = None,         # ms since epoch — backtest only
-    length: int | None = None,           # bars — live only
+    mode: str = "backtest",                    # "backtest" | "live"
+    start_time: int | str | None = None,       # backtest only
+    end_time: int | str | None = None,         # backtest only
+    length: int | None = None,                 # bars — live only
 ) -> pandas.DataFrame
 ```
 
@@ -104,15 +104,22 @@ One call shape, two modes:
 **`mode="backtest"`** — a fixed historical range.
 
 ```python
-import time
-now = int(time.time() * 1000)
-one_week_ago = now - 7 * 24 * 3600 * 1000
-
-df = fetcher.get(ROUTE, mode="backtest", start_time=one_week_ago, end_time=now)
+df = fetcher.get(ROUTE, mode="backtest", start_time="2023-01-01", end_time="now")
 ```
 
-- `start_time`/`end_time` are **milliseconds since epoch** (`int`). Either or both may
-  be omitted — a flat 7-day default range is used when both are missing.
+- `start_time`/`end_time` accept either an `int` (milliseconds since epoch — the
+  original contract, still works unchanged) or a human-readable string:
+  - `"2023-01-01"` — a date alone means midnight UTC that day.
+  - `"2023-01-01 00:00:00"` or `"2023-01-01T00:00:00"` — date + time, either separator.
+  - `"now"` — current time; case-insensitive (`"NOW"`, `"Now"` also work).
+  - **String inputs are always interpreted as UTC**, deliberately never the calling
+    machine's local timezone — `start_time="2023-01-01"` means the same real moment
+    no matter where the script runs. Pass an `int` yourself if you need a specific
+    non-UTC offset.
+  - An unrecognized string raises `ValueError` naming the accepted formats; a
+    non-`int`/`str`/`None` value raises `TypeError`.
+  - Either or both may be omitted entirely — a flat 7-day default range is used when
+    both are missing.
 - Ranges larger than the gateway allows in one call are **chunked automatically**:
   the SDK tries the full range first, and if the gateway rejects it for being too
   large, reads the *exact* per-request limit out of that rejection and splits into
@@ -318,7 +325,7 @@ except CytradeAPIError as e:
 ROUTE = "bybit-direct|/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60"
 
 # backtest
-df = fetcher.get(ROUTE, mode="backtest", start_time=one_week_ago, end_time=now)
+df = fetcher.get(ROUTE, mode="backtest", start_time="2023-01-01", end_time="now")
 
 # live — same route, same downstream code, just a different call
 df = fetcher.get(ROUTE, mode="live", length=700)

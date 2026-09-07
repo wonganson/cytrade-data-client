@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- `mode="backtest"`'s `start_time`/`end_time` now accept human-readable strings, not
+  just raw milliseconds: `"2023-01-01"`, `"2023-01-01 00:00:00"`,
+  `"2023-01-01T00:00:00"`, and `"now"` (case-insensitive). Passing an `int` still
+  works exactly as before — fully backwards compatible. String inputs are always
+  interpreted as UTC, never the calling machine's local timezone, so the same date
+  string always means the same real moment regardless of where the script runs.
+
 ## 0.2.0
 
 - `mode="live"` (and `.watch()`/`.watch_many()`, which share the same fetch path) now

@@ -57,12 +57,43 @@ df = fetcher.get(
   detailed design record — why things work the way they do; `docs/API.md` is the
   lookup reference — what to call and what you get back.
 
+## `start_time`/`end_time` accept human-readable strings, not just raw ms
+
+`_parse_time()` (top of `client.py`) runs both through before anything else touches
+them — `.get()` calls it right after the `mode="backtest"` branch, so `_get_backtest`
+and everything downstream still only ever sees an `int` or `None`, unchanged from
+before this existed. Accepts an `int` as-is (the original contract — nothing passing
+raw ms breaks), or a string: `"2023-01-01"` (midnight that day), `"2023-01-01
+00:00:00"` / `"2023-01-01T00:00:00"` (either separator), or `"now"`
+(case-insensitive — `.strip().lower() == "now"`, so `"NOW"`/`" now "` both work too).
+
+**String inputs are always parsed as UTC, deliberately, never the calling machine's
+own local timezone** — `datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)`,
+not `datetime.now()`/a naive local `strptime`. This matters specifically because the
+alternative failure mode is silent, not a crash: a naive-local parse of
+`start_time="2023-01-01"` would mean midnight in whatever timezone the *script*
+happens to run in, so the exact same call could quietly request a different real
+range depending on whether it ran from a machine in UTC, UTC+8, or UTC-5 — for a
+quant data SDK, a silently-shifted historical range is a correctness bug, not a
+display quirk, and one that would never announce itself with an error. Anchoring to
+UTC in the parser itself removes that variable entirely: the same string always means
+the same real moment, everywhere this SDK runs. A caller who genuinely needs a
+non-UTC offset still can — pass an `int` ms value computed however they like; only
+the string convenience path is UTC-fixed.
+
+An unrecognized string raises `ValueError` naming every accepted format (not a vague
+parse error) and a non-`int`/`str`/`None` value raises `TypeError` — both fail at the
+`.get()` call site, before any HTTP request goes out, same "fail fast on a
+structurally broken call" philosophy `Watcher._start()` already uses for its first
+fetch.
+
 ## `mode="backtest"` vs `mode="live"` — what actually differs
 
 Both modes hit the exact same `POST /v1/fetch` endpoint. The only difference is which
 fields go in the request body:
 
-- **backtest** sends `start_time`/`end_time` — if either is omitted, `_get_backtest()`
+- **backtest** sends `start_time`/`end_time` (see `_parse_time()` above for the
+  accepted formats) — if either is omitted, `_get_backtest()`
   fills in a flat 7-day default locally (`DEFAULT_RANGE_MS`, the SDK's only remaining
   hardcoded constant, purely a UX default, not a safety cap). The SDK does **not**
   hardcode a max-range constant — it tries the full request first; if the gateway
