@@ -38,7 +38,7 @@ pip install -e /path/to/cytrade-data-client
 ```python
 from cytrade_client import DataFetcher
 
-fetcher = DataFetcher(api_key="your-api-key", base_url="http://localhost:8420")
+fetcher = DataFetcher(api_key="your-api-key", base_url="https://api.alphaxllama.com")
 
 ROUTE = "bybit-direct|/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60"
 
@@ -60,11 +60,16 @@ for watching several feeds at once and merging them by timestamp.
 
 ## Full API reference
 
-The SDK just calls the gateway's HTTP API — for the complete, always-accurate list of
-every endpoint, parameter, and response shape, open your gateway's interactive docs:
+For every `DataFetcher`/`Watcher`/`MultiWatcher` method, parameter, return shape, and
+exception, see **[docs/API.md](docs/API.md)** — a complete reference with usage
+examples for each one.
 
-**[http://localhost:8420/docs](http://localhost:8420/docs)** (swap the host for
-wherever your gateway actually runs)
+For the complete, always-accurate list of every gateway endpoint, parameter, and
+response shape (route strings, provider params), open the gateway's own interactive
+docs:
+
+**[https://api.alphaxllama.com/docs](https://api.alphaxllama.com/docs)** (swap the
+host for `http://localhost:8420/docs` if you're pointed at a local checkout instead)
 
 That page is generated straight from the gateway's code, so it can't fall out of sync
 the way a hand-written doc can — treat it as the source of truth for what routes

@@ -8,7 +8,7 @@ import time
 
 from cytrade_client import DataFetcher
 
-fetcher = DataFetcher(api_key="YOUR_API_KEY", base_url="http://localhost:8420")
+fetcher = DataFetcher(api_key="YOUR_API_KEY", base_url="https://api.alphaxllama.com")
 
 ROUTE = "bybit-direct|/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60"
 

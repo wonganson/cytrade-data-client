@@ -10,7 +10,7 @@ import time
 
 from cytrade_client import DataFetcher
 
-fetcher = DataFetcher(api_key="YOUR_API_KEY", base_url="http://localhost:8420")
+fetcher = DataFetcher(api_key="YOUR_API_KEY", base_url="https://api.alphaxllama.com")
 
 # route -> poll_interval (seconds). Faster bars get polled more often; a 1h
 # feed gains nothing from being checked every second, it just burns requests

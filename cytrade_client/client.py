@@ -10,7 +10,7 @@ from . import _display
 from .exceptions import CytradeAPIError, QuotaExceededError
 from .watcher import MultiWatcher, Watcher
 
-DEFAULT_BASE_URL = "http://localhost:8420"  # not 8000 — Docker Desktop also binds that on Windows
+DEFAULT_BASE_URL = "https://api.alphaxllama.com"  # the deployed gateway; pass base_url="http://localhost:8420" to hit a local checkout instead
 DEFAULT_RANGE_MS = 7 * 24 * 3600 * 1000  # used only when start_time/end_time are both omitted
 
 

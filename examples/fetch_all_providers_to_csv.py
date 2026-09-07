@@ -18,7 +18,7 @@ from cytrade_client import DataFetcher
 from cytrade_client.exceptions import CytradeAPIError
 
 API_KEY = "YOUR_API_KEY"
-BASE_URL = "http://localhost:8420"
+BASE_URL = "https://api.alphaxllama.com"
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "output"
 THREE_YEARS_MS = 3 * 365 * 24 * 3600 * 1000

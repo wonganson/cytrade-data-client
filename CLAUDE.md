@@ -1,16 +1,21 @@
 # cytrade-data-client
 
-The public SDK for the **cytrade-data** gateway. A thin HTTP client — no provider
-logic, no credentials, nothing sensitive. Safe to open-source or hand out freely,
-unlike the gateway repo it talks to.
+The internal SDK for the **cytrade-data** gateway, used by the team to pull both
+backtest and live market data. A thin HTTP client — no provider logic, no
+credentials, nothing sensitive.
 
 The whole point: one call shape works for both a backtest and a live strategy, so
 switching between them is a one-line change, not a rewrite.
 
+The gateway is deployed at `https://api.alphaxllama.com` — that's `DEFAULT_BASE_URL`
+in `client.py`, so it's used automatically when `base_url` is omitted. Pass
+`base_url="http://localhost:8420"` explicitly to point at a local checkout instead
+(see "Local development against a local gateway" below).
+
 ```python
 from cytrade_client import DataFetcher
 
-fetcher = DataFetcher(api_key="...", base_url="https://your-gateway.example.com")
+fetcher = DataFetcher(api_key="...")  # base_url defaults to the deployed gateway
 
 # backtest: a fixed historical range
 df = fetcher.get(
@@ -46,7 +51,11 @@ df = fetcher.get(
 - `cytrade_client/watcher.py` — `Watcher`, returned by `DataFetcher.watch()`. A small
   background-thread poller; see its own section below.
 - `examples/example_usage.py`, `examples/fetch_all_providers_to_csv.py`,
-  `examples/multi_feed_merge.py` — usage templates against a locally-running gateway.
+  `examples/multi_feed_merge.py` — usage templates against the deployed gateway.
+- `docs/API.md` — full method-by-method SDK reference (params, return shapes,
+  exceptions, examples for every public method). This file (`CLAUDE.md`) is the
+  detailed design record — why things work the way they do; `docs/API.md` is the
+  lookup reference — what to call and what you get back.
 
 ## `mode="backtest"` vs `mode="live"` — what actually differs
 
@@ -228,10 +237,12 @@ pip install -e /path/to/cytrade-data-client
 ```
 
 Then run the gateway (`./start.sh` in `cytrade-data`, or
-`uvicorn api.main:app --port 8420`) and point `base_url` at it. There's no mock/stub
-server here — testing this SDK means testing it against a real running gateway
-instance, which is how it was verified when built (real HTTP calls, not just a
-TestClient).
+`uvicorn api.main:app --port 8420`) and pass `base_url="http://localhost:8420"`
+explicitly — `DataFetcher`'s default now points at the deployed gateway
+(`https://api.alphaxllama.com`), so a local instance is opt-in, not the default.
+There's no mock/stub server here — testing this SDK means testing it against a real
+running gateway instance, which is how it was verified when built (real HTTP calls,
+not just a TestClient).
 
 ## Extending this SDK
 
