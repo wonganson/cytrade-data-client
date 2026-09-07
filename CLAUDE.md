@@ -86,10 +86,40 @@ fields go in the request body:
   to read each provider's own interval notation (`interval=60` vs `i=1h` vs
   `window=hour`, ...). This SDK deliberately does **not** duplicate that parsing —
   keeping interval knowledge in one place (the gateway) was a specific design choice
-  to avoid the two repos drifting out of sync on provider-specific formats. Same
-  adaptive handling applies if `length` exceeds the gateway's row cap for that endpoint
-  (`CytradeAPIError.max_allowed_rows`); the SDK surfaces it rather than silently
-  clamping, since a live call generally shouldn't be silently shrunk.
+  to avoid the two repos drifting out of sync on provider-specific formats.
+
+  **`length` requests are now chunked automatically too, not just backtest ranges**
+  (`DataFetcher._get_live` in `client.py`) — this used to raise `CytradeAPIError`
+  with `.max_allowed_rows` set and stop there, on the reasoning that "a live call
+  generally shouldn't be silently shrunk." That held right up until `.watch_many()`
+  needed it too: a caller building a rolling window bigger than one endpoint's
+  per-call cap (`length=2000` against a 1000-row-max endpoint) had to hand-roll their
+  own chunking loop just to get the same "ask for what you want" ergonomics
+  `mode="backtest"` already had — exactly the loop-writing this SDK exists to save
+  people from. The catch: unlike a range-exceeded rejection (which carries the exact
+  `max_allowed_ms` to chunk by), a length-exceeded rejection only ever carries
+  `max_allowed_rows` — the gateway has no time range to hand back for a request that
+  was never framed as one, and per the interval-in-one-place decision above, this SDK
+  still won't parse the endpoint's own interval notation to compute one itself.
+  `_get_live` instead **infers** the interval from real data: on a "too many rows"
+  rejection, it fetches one probe chunk at the largest single-call size (returns real
+  bars), infers `interval_ms` from the spacing between the two most recent ones (same
+  technique `Watcher._compute_delay` already uses for poll scheduling — see below),
+  then walks further chunks backward from the probe's oldest bar — same
+  dedup/stop-on-an-empty-chunk shape `_fetch_chunked` uses for backtest — until enough
+  rows are in hand or history runs out, then trims to exactly `length` most recent
+  rows. Applies uniformly to `mode="live"`, `.watch()` (every poll, not just the
+  first fetch), and `.watch_many()`, since all three funnel through the same
+  `_fetch_live_quiet` → `_get_live` choke point — one fix, three entry points.
+  Verified with a mocked `_request` covering: multi-chunk stitching to the exact
+  requested length, stopping cleanly at the real start of history (fewer rows
+  returned than requested, no padding/error), falling back to the un-chunked result
+  when there's too little data to infer an interval from (<2 rows), and confirming a
+  429/other-400 still propagates untouched rather than being swallowed by this path
+  (`tests/test_get_live.py`). An endpoint whose interval genuinely can't be inferred
+  at all (`length` unsupported there in the first place) still fails exactly as
+  before — this only changes what happens once an interval-having endpoint's `length`
+  exceeds the per-call cap, not endpoints that never supported `length` to begin with.
 
 **`fetcher.get(..., mode="live", ...)` does not hold a connection open or run a
 background thread.** Each call is one HTTP request, and returns immediately — it does

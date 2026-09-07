@@ -81,7 +81,7 @@ class DataFetcher:
                 raise ValueError("mode='live' requires length (the number of most recent bars to return)")
             started_at = time.perf_counter()
             self._header_live(route, length)
-            df = self._request(provider, path, params, length=length)
+            df = self._get_live(provider, path, params, length, verbose_note=True)
             self._footer_live(df, time.perf_counter() - started_at)
             return df
 
@@ -94,7 +94,76 @@ class DataFetcher:
         length / rows" block on every single poll of a long-running watch would be far
         noisier than the one-line-per-update format a live session actually wants."""
         provider, path, params = _parse_route(route)
-        return self._request(provider, path, params, length=length)
+        return self._get_live(provider, path, params, length, verbose_note=False)
+
+    def _get_live(
+        self,
+        provider: str,
+        path: str,
+        params: Dict[str, str],
+        length: int,
+        verbose_note: bool,
+    ) -> pd.DataFrame:
+        """The `length` counterpart to `_get_backtest`'s chunking — same "the caller
+        asks for what they want, the SDK handles however many round trips that takes"
+        contract, just for "last N bars" instead of an explicit range.
+
+        The gateway resolves `length` into a time range itself (see client.py's module
+        docstring / CLAUDE.md — this SDK deliberately doesn't duplicate that parsing),
+        so unlike a range-exceeded rejection, a length-exceeded rejection only carries
+        `max_allowed_rows`, never `max_allowed_ms` — there's no interval for the SDK to
+        chunk by until it has real data to infer one from. So: try the full request
+        first; on a "too many rows" rejection, fetch one probe chunk at the largest
+        allowed size (real bars, so the interval can be inferred from their spacing —
+        same technique Watcher._compute_delay already uses), then walk further chunks
+        backward from the probe's oldest bar — same dedup/stop-on-empty shape
+        `_fetch_chunked` uses for backtest — until enough rows are in hand or history
+        runs out, and trim to exactly `length` most recent rows.
+        """
+        try:
+            return self._request(provider, path, params, length=length)
+        except CytradeAPIError as e:
+            if e.max_allowed_rows is None or length <= e.max_allowed_rows:
+                raise  # not a "too many rows" rejection, or nothing here to chunk
+            max_rows = e.max_allowed_rows
+
+        probe = self._request(provider, path, params, length=max_rows)
+        if len(probe) < 2 or "datetime" not in probe.columns:
+            return probe  # can't infer bar spacing from <2 rows — best effort, hand back what we have
+
+        times = pd.to_datetime(probe["datetime"])
+        interval_ms = int((times.iloc[-1] - times.iloc[-2]).total_seconds() * 1000)
+        if interval_ms <= 0:
+            return probe  # non-evenly-spaced rows — same fallback Watcher._compute_delay uses
+
+        if verbose_note:
+            self._line(
+                f"  length={length:,} exceeds {max_rows:,}/call — stitching requests",
+                _display.LIGHT_GREEN,
+            )
+
+        oldest_ms = int(times.iloc[0].timestamp() * 1000)
+        remaining = length - len(probe)
+        start_time = oldest_ms - remaining * interval_ms
+        chunk_end = oldest_ms
+        frames = [probe]
+
+        # Walk backward exactly like _fetch_chunked — an empty chunk means we've
+        # reached the start of this symbol's history, so stop instead of firing off
+        # further, guaranteed-empty requests.
+        while remaining > 0 and chunk_end > start_time:
+            chunk_start = max(chunk_end - max_rows * interval_ms, start_time)
+            df = self._request(provider, path, params, start_time=chunk_start, end_time=chunk_end)
+            if df.empty:
+                break
+            frames.append(df)
+            remaining -= len(df)
+            chunk_end = chunk_start
+
+        combined = pd.concat(frames, ignore_index=True)
+        if "datetime" in combined.columns:
+            combined = combined.drop_duplicates(subset="datetime").sort_values("datetime").reset_index(drop=True)
+        return combined.tail(length).reset_index(drop=True)
 
     def watch(
         self,

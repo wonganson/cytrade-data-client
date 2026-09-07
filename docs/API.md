@@ -129,14 +129,19 @@ df = fetcher.get(ROUTE, mode="live", length=700)
 ```
 
 - `length` is required, `start_time`/`end_time` must not be passed.
-- One HTTP request, returns immediately — **does not** hold a connection open or loop.
-  Call it again yourself (or use [`.watch()`](#watch)) to keep a feed current.
+- Does **not** hold a connection open or loop by itself. Call it again yourself (or
+  use [`.watch()`](#watch)) to keep a feed current.
 - The gateway resolves `length` bars into an actual time range itself — the SDK
   doesn't parse provider interval notation, so `length` support/behavior follows
   whatever that endpoint supports server-side.
-- If `length` exceeds the gateway's per-call row cap, this raises `CytradeAPIError`
-  with `.max_allowed_rows` set (not silently clamped — see
-  [Exceptions](#exceptions)).
+- `length` bigger than the endpoint's per-call row cap is **chunked automatically**,
+  same as an oversized backtest range: the SDK tries the full `length` in one call,
+  and on rejection, infers the bar interval from real returned data and walks further
+  chunks backward until it has enough rows or runs out of history, trimmed to exactly
+  `length` most recent rows. This can mean more than one HTTP request for a large
+  `length`. You still won't see a `CytradeAPIError` for this case — only for an
+  endpoint that doesn't support `length` at all (its interval can't be inferred even
+  from one probe chunk).
 
 **Returned `DataFrame` columns** depend on the endpoint — check
 `.endpoints(provider)`'s `output_columns` for `*-direct` providers, or the gateway's
@@ -289,10 +294,12 @@ from cytrade_client import CytradeAPIError, QuotaExceededError
 
 `.max_allowed_ms`/`.max_allowed_rows` are set **only** when the gateway rejected the
 call for exceeding its per-request size limit — that limit is computed per
-provider/interval on the gateway side, not a fixed constant, so read it from the
-exception rather than assuming a number. For `mode="backtest"`, this case is already
-handled for you (chunked automatically); you'll only see it directly for `mode="live"`
-with too large a `length`.
+provider/interval on the gateway side, not a fixed constant. Both `mode="backtest"`
+and `mode="live"`/`.watch()`/`.watch_many()` now handle this rejection for you
+automatically (chunked into multiple requests, stitched back into one `DataFrame`) —
+you'll only see `CytradeAPIError` directly for an endpoint that doesn't support the
+call shape you asked for at all (e.g. `length` on an endpoint whose bar interval can't
+be inferred), or for other non-200 responses like a quota rejection.
 
 ```python
 try:
@@ -301,8 +308,6 @@ except QuotaExceededError as e:
     print(f"monthly limit reached: {e.detail}")
 except CytradeAPIError as e:
     print(f"[{e.status_code}] {e.detail}")
-    if e.max_allowed_rows:
-        print(f"max rows per call for this endpoint: {e.max_allowed_rows}")
 ```
 
 ## Guide: common patterns
@@ -388,7 +393,8 @@ fetcher = DataFetcher(api_key="...", verbose=False)
 | `ValueError: length is only used with mode='live'` | Passed `length` together with `mode="backtest"` — use `start_time`/`end_time` instead. |
 | `ValueError: mode='live' requires length` | Called `.get(..., mode="live")` without `length`. |
 | `QuotaExceededError` | Monthly call limit reached for this API key — see `.detail` for specifics. |
-| `CytradeAPIError` with `.max_allowed_rows` set, on `mode="live"` | Requested `length` exceeds this endpoint's per-call row cap — request fewer bars, or use `mode="backtest"` with a range instead (that path chunks automatically). |
+| `CytradeAPIError: length isn't supported for this endpoint` | This endpoint's bar interval can't be inferred at all (see `.endpoints(provider)`'s `supports_length`) — use `mode="backtest"` with `start_time`/`end_time` instead; a `length` bigger than the per-call cap is *not* this error, that's chunked automatically. |
+| `.watch()`/`.watch_many()` feels slow to start with a large `length` | A `length` above the endpoint's per-call cap now takes several HTTP round trips (chunked automatically, see [`.get()`](#get)) instead of one — expected for the first fetch of a large window; subsequent polls are usually fast since the gateway caches closed bars. |
 | `.watch()` raises immediately | The *first* fetch is fail-fast by design (bad route, unsupported `length` on this endpoint, bad key). Fix the underlying call before retrying. |
 | A running `Watcher`'s `.data` looks stale but no error | Check `.last_error` — polling after the first fetch is resilient, not fail-fast, so a persistent failure (revoked key, network issue) keeps the last good `.data` instead of raising. |
 | `watch_many()`'s `on_update` never fires | Routes are on different bar intervals — their closed bars essentially never land on the same timestamp. Watch each separately with `.watch()` instead. |
