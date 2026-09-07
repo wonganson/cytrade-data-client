@@ -6,9 +6,25 @@ HTTP client — no provider logic, no credentials, nothing sensitive.
 
 ## Install
 
+Internal repo — not published to PyPI. Install straight from GitHub, pinned to a
+release tag so everyone on the team is on a known, reproducible version:
+
 ```bash
-pip install cytrade-data-client
+pip install git+https://github.com/wonganson/cytrade-data-client.git@v0.1.0
 ```
+
+To pick up a later release, upgrade to a newer tag the same way:
+
+```bash
+pip install --upgrade git+https://github.com/wonganson/cytrade-data-client.git@v0.2.0
+```
+
+In a `requirements.txt`, pin it the same way:
+`git+https://github.com/wonganson/cytrade-data-client.git@v0.1.0#egg=cytrade-data-client`
+
+Avoid installing without a `@tag` (i.e. plain `.git` with no ref) — that floats on
+whatever `main` currently has, so two teammates installing on different days can end
+up on different, unpinned code with no way to tell which version either one has.
 
 If you're developing against a local gateway checkout and want changes picked up
 without reinstalling, install this package editable instead:
