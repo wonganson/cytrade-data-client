@@ -1,18 +1,20 @@
 # cytrade-data-client
 
-Python SDK for the [cytrade-data](../cytrade-data) gateway. One call shape works for
-both a backtest and a live strategy, so switching between them is a one-line change,
-not a rewrite. A thin HTTP client — no provider logic, no credentials, nothing
-sensitive.
+Python SDK for the Cytrade data gateway. One call shape works for both a backtest and
+a live strategy, so switching between them is a one-line change, not a rewrite. A thin
+HTTP client — no provider logic, no credentials, nothing sensitive.
 
 ## Install
 
-Not published anywhere yet — while developing against a local
-[cytrade-data](../cytrade-data) checkout, install this editable so changes are picked
-up without reinstalling:
+```bash
+pip install cytrade-data-client
+```
+
+If you're developing against a local gateway checkout and want changes picked up
+without reinstalling, install this package editable instead:
 
 ```bash
-pip install -e "C:\Users\WANSO\Documents\GitHub\cytrade-data-client"
+pip install -e /path/to/cytrade-data-client
 ```
 
 ## Quickstart

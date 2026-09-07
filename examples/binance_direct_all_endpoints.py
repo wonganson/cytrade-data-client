@@ -10,7 +10,7 @@ import time
 
 from cytrade_client import DataFetcher
 
-fetcher = DataFetcher(api_key="REDACTED-ROTATED-KEY", base_url="http://localhost:8420")
+fetcher = DataFetcher(api_key="YOUR_API_KEY", base_url="http://localhost:8420")
 
 PROVIDER = "binance-direct"
 now = int(time.time() * 1000)

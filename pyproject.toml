@@ -2,8 +2,40 @@
 name = "cytrade-data-client"
 version = "0.1.0"
 description = "Python SDK for the Cytrade data gateway — one call for both backtest and live data."
+readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["requests", "pandas"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "wonganson", email = "wonganson0387@gmail.com" },
+]
+keywords = ["cytrade", "crypto", "trading", "market-data", "backtest", "sdk"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "requests>=2.25",
+    "pandas>=1.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "build", "twine"]
+
+[project.urls]
+Homepage = "https://github.com/wonganson/cytrade-data-client"
+Repository = "https://github.com/wonganson/cytrade-data-client"
+Issues = "https://github.com/wonganson/cytrade-data-client/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -11,3 +43,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["cytrade_client*"]
+
+[tool.setuptools.package-data]
+cytrade_client = ["py.typed"]

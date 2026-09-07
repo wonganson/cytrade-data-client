@@ -219,12 +219,12 @@ page size, and this SDK just follows whatever it's told.
 
 ## Local development against a local gateway
 
-This isn't published anywhere (no PyPI, no registry) — while developing against a
-local `cytrade-data` checkout, install it editable so changes are picked up without
-reinstalling:
+Published on PyPI as `cytrade-data-client`. While developing against a local
+`cytrade-data` checkout, install this editable instead so changes are picked up
+without reinstalling:
 
 ```bash
-pip install -e "C:\Users\WANSO\Documents\GitHub\cytrade-data-client"
+pip install -e /path/to/cytrade-data-client
 ```
 
 Then run the gateway (`./start.sh` in `cytrade-data`, or

@@ -4,3 +4,10 @@ __pycache__/
 build/
 dist/
 .env
+
+# generated run output, not source
+/output/
+examples/output/
+.pytest_cache/
+.ruff_cache/
+*.egg-info
